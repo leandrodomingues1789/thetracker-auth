@@ -220,40 +220,46 @@
             // Parse tokens from URL
             const { accessToken, refreshToken, type, code } = getTokens();
             console.log('Extracted tokens:', { accessToken, refreshToken, type, code });
+            console.log('Full URL:', window.location.href);
             
-            // Check if we have valid reset parameters
-            if (accessToken && refreshToken) {
-                // Direct token flow - set session and show form
-                setTimeout(async () => {
-                    try {
+            // Initialize session check
+            async function initializeSession() {
+                try {
+                    // First, check if we already have a session from Supabase redirect
+                    const { data: { session }, error } = await supabase.auth.getSession();
+                    console.log('Current session:', session);
+                    
+                    if (session) {
+                        // We have a valid session, show the password form
+                        showState('password-form');
+                        return;
+                    }
+                    
+                    // If no session, try to handle URL parameters
+                    if (accessToken && refreshToken) {
+                        // Direct token flow - set session and show form
                         await supabase.auth.setSession({
                             access_token: accessToken,
                             refresh_token: refreshToken
                         });
                         showState('password-form');
-                    } catch (error) {
-                        console.error('Session error:', error);
-                        showError('Invalid or expired reset link');
-                    }
-                }, 1000);
-            } else if (code) {
-                // Authorization code flow - exchange for session
-                setTimeout(async () => {
-                    try {
+                    } else if (code) {
+                        // Authorization code flow - exchange for session
                         const { data, error } = await supabase.auth.exchangeCodeForSession(code);
                         if (error) throw error;
                         showState('password-form');
-                    } catch (error) {
-                        console.error('Code exchange error:', error);
-                        showError('Invalid or expired reset link');
+                    } else {
+                        // No valid parameters and no session
+                        showError('Invalid or missing reset parameters');
                     }
-                }, 1000);
-            } else {
-                // No valid parameters
-                setTimeout(() => {
-                    showError('Invalid or missing reset parameters');
-                }, 1000);
+                } catch (error) {
+                    console.error('Session initialization error:', error);
+                    showError('Invalid or expired reset link');
+                }
             }
+            
+            // Wait a moment for any redirects to complete, then initialize
+            setTimeout(initializeSession, 1500);
             
             // Handle form submission
             resetForm.addEventListener('submit', async function(e) {
