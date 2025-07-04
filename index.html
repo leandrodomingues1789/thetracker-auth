@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TheTracker - Password Reset</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            background-color: #f8f9fa;
+            color: #212529;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+        h1 {
+            margin-bottom: 20px;
+            color: #343a40;
+        }
+        p {
+            margin-bottom: 30px;
+            color: #6c757d;
+        }
+        .success {
+            color: #28a745;
+            font-weight: bold;
+        }
+        .error {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        #message {
+            margin: 20px 0;
+            font-weight: bold;
+        }
+        .app-logo {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <img src="https://github.com/yourusername/thetracker-auth/raw/main/app-icon.png" alt="TheTracker Logo" class="app-logo">
+        <h1>TheTracker Password Reset</h1>
+        <div id="message">Processing your password reset request...</div>
+        <p>Please wait while we redirect you back to the app.</p>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Parse URL parameters
+            const params = new URLSearchParams(window.location.hash.substring(1));
+            const accessToken = params.get('access_token');
+            const refreshToken = params.get('refresh_token');
+            const type = params.get('type');
+            
+            const messageElement = document.getElementById('message');
+            
+            // Check if this is a password reset request
+            if (type === 'recovery' && accessToken && refreshToken) {
+                messageElement.textContent = 'Password reset successful!';
+                messageElement.className = 'success';
+                
+                // Create the deep link URL with the tokens
+                const deepLink = `thetracker://reset-password?access_token=${encodeURIComponent(accessToken)}&refresh_token=${encodeURIComponent(refreshToken)}`;
+                
+                // Try to open the app
+                window.location.href = deepLink;
+                
+                // Fallback message after a delay in case the app doesn't open
+                setTimeout(() => {
+                    messageElement.textContent = 'If the app didn\'t open automatically, please return to TheTracker app and enter your new password.';
+                }, 3000);
+            } else {
+                messageElement.textContent = 'Invalid or missing reset parameters.';
+                messageElement.className = 'error';
+            }
+        });
+    </script>
+</body>
+</html> 
