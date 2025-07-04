@@ -238,32 +238,42 @@
             // Initialize session check
             async function initializeSession() {
                 try {
+                    console.log('Initializing session...');
+                    
+                    // First check if we already have a session
+                    const { data: { session }, error } = await supabase.auth.getSession();
+                    console.log('Initial session check:', session);
+                    
+                    if (session) {
+                        showState('password-form');
+                        return;
+                    }
+                    
                     // Check if we have URL parameters that indicate a password reset
                     if (code || accessToken || window.location.search.includes('code=') || window.location.hash.includes('access_token')) {
-                        console.log('Password reset parameters detected, checking session...');
+                        console.log('Password reset parameters detected, trying to establish session...');
                         
-                        // Wait for Supabase to process the redirect and establish session
-                        let attempts = 0;
-                        const maxAttempts = 10;
+                        // Try to get session from URL hash/fragments
+                        const { data, error } = await supabase.auth.getSessionFromUrl();
+                        console.log('Session from URL:', data, error);
                         
-                        const checkSession = async () => {
-                            attempts++;
+                        if (data.session) {
+                            console.log('Successfully got session from URL');
+                            showState('password-form');
+                            return;
+                        }
+                        
+                        // If getSessionFromUrl didn't work, wait and check again
+                        setTimeout(async () => {
                             const { data: { session }, error } = await supabase.auth.getSession();
-                            console.log(`Session check attempt ${attempts}:`, session);
+                            console.log('Final session check:', session);
                             
                             if (session) {
                                 showState('password-form');
-                                return;
-                            }
-                            
-                            if (attempts < maxAttempts) {
-                                setTimeout(checkSession, 500);
                             } else {
                                 showError('Reset link has expired or is invalid. Please request a new password reset.');
                             }
-                        };
-                        
-                        checkSession();
+                        }, 2000);
                     } else {
                         // No reset parameters found
                         showError('Invalid or missing reset parameters');
