@@ -178,6 +178,19 @@
             const submitBtn = document.getElementById('submit-btn');
             const errorMessage = document.getElementById('error-message');
             
+            // Listen for auth state changes
+            supabase.auth.onAuthStateChange((event, session) => {
+                console.log('Auth state changed:', event, session);
+                
+                if (event === 'SIGNED_IN' && session) {
+                    console.log('User signed in via password reset');
+                    showState('password-form');
+                } else if (event === 'PASSWORD_RECOVERY') {
+                    console.log('Password recovery event detected');
+                    showState('password-form');
+                }
+            });
+            
             // Function to parse URL parameters from both hash and query string
             function getTokens() {
                 let accessToken, refreshToken, type, code;
@@ -225,31 +238,34 @@
             // Initialize session check
             async function initializeSession() {
                 try {
-                    // First, check if we already have a session from Supabase redirect
-                    const { data: { session }, error } = await supabase.auth.getSession();
-                    console.log('Current session:', session);
-                    
-                    if (session) {
-                        // We have a valid session, show the password form
-                        showState('password-form');
-                        return;
-                    }
-                    
-                    // If no session, try to handle URL parameters
-                    if (accessToken && refreshToken) {
-                        // Direct token flow - set session and show form
-                        await supabase.auth.setSession({
-                            access_token: accessToken,
-                            refresh_token: refreshToken
-                        });
-                        showState('password-form');
-                    } else if (code) {
-                        // Authorization code flow - exchange for session
-                        const { data, error } = await supabase.auth.exchangeCodeForSession(code);
-                        if (error) throw error;
-                        showState('password-form');
+                    // Check if we have URL parameters that indicate a password reset
+                    if (code || accessToken || window.location.search.includes('code=') || window.location.hash.includes('access_token')) {
+                        console.log('Password reset parameters detected, checking session...');
+                        
+                        // Wait for Supabase to process the redirect and establish session
+                        let attempts = 0;
+                        const maxAttempts = 10;
+                        
+                        const checkSession = async () => {
+                            attempts++;
+                            const { data: { session }, error } = await supabase.auth.getSession();
+                            console.log(`Session check attempt ${attempts}:`, session);
+                            
+                            if (session) {
+                                showState('password-form');
+                                return;
+                            }
+                            
+                            if (attempts < maxAttempts) {
+                                setTimeout(checkSession, 500);
+                            } else {
+                                showError('Reset link has expired or is invalid. Please request a new password reset.');
+                            }
+                        };
+                        
+                        checkSession();
                     } else {
-                        // No valid parameters and no session
+                        // No reset parameters found
                         showError('Invalid or missing reset parameters');
                     }
                 } catch (error) {
