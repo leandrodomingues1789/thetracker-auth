@@ -62,24 +62,48 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // Parse URL parameters
-            const params = new URLSearchParams(window.location.hash.substring(1));
-            const accessToken = params.get('access_token');
-            const refreshToken = params.get('refresh_token');
-            const type = params.get('type');
-            
             const messageElement = document.getElementById('message');
             
+            // Function to parse URL parameters from both hash and query string
+            function getTokens() {
+                let accessToken, refreshToken, type;
+                
+                // First try to get from hash (fragment) - common for Supabase
+                if (window.location.hash) {
+                    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+                    accessToken = hashParams.get('access_token');
+                    refreshToken = hashParams.get('refresh_token');
+                    type = hashParams.get('type');
+                }
+                
+                // If not found in hash, try query string
+                if (!accessToken || !refreshToken) {
+                    const queryParams = new URLSearchParams(window.location.search);
+                    accessToken = accessToken || queryParams.get('access_token');
+                    refreshToken = refreshToken || queryParams.get('refresh_token');
+                    type = type || queryParams.get('type');
+                }
+                
+                return { accessToken, refreshToken, type };
+            }
+            
+            // Debug: Log the current URL for troubleshooting
+            console.log('Current URL:', window.location.href);
+            console.log('Hash:', window.location.hash);
+            console.log('Search:', window.location.search);
+            
+            const { accessToken, refreshToken, type } = getTokens();
+            
+            // Debug: Log extracted tokens
+            console.log('Extracted tokens:', { accessToken, refreshToken, type });
+            
             // Check if this is a password reset request
-            if (type === 'recovery' && accessToken && refreshToken) {
-                messageElement.textContent = 'Password reset successful!';
+            if (accessToken && refreshToken) {
+                messageElement.textContent = 'Password reset tokens found! Redirecting to app...';
                 messageElement.className = 'success';
                 
-                // Create the deep link URL with the tokens
-                const deepLink = `thetracker://reset-password?access_token=${encodeURIComponent(accessToken)}&refresh_token=${encodeURIComponent(refreshToken)}`;
-                
-                // Try to open the app
-                window.location.href = deepLink;
+                // Redirect to the app with the tokens
+                window.location.href = `thetracker://reset-password?access_token=${accessToken}&refresh_token=${refreshToken}&type=recovery`;
                 
                 // Fallback message after a delay in case the app doesn't open
                 setTimeout(() => {
@@ -88,6 +112,11 @@
             } else {
                 messageElement.textContent = 'Invalid or missing reset parameters.';
                 messageElement.className = 'error';
+                
+                // Debug: Show what we found
+                console.log('Missing tokens. URL breakdown:');
+                console.log('- Hash params:', window.location.hash);
+                console.log('- Query params:', window.location.search);
             }
         });
     </script>
