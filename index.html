@@ -12,7 +12,7 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
+            min-height: 100vh;
             margin: 0;
             padding: 20px;
         }
@@ -28,10 +28,54 @@
         h1 {
             margin-bottom: 20px;
             color: #343a40;
+            font-size: 24px;
         }
         p {
-            margin-bottom: 30px;
+            margin-bottom: 20px;
             color: #6c757d;
+            line-height: 1.5;
+        }
+        .form-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #343a40;
+        }
+        input[type="password"] {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ced4da;
+            border-radius: 6px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        input[type="password"]:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+        }
+        .btn {
+            width: 100%;
+            padding: 12px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .btn:hover {
+            background-color: #0056b3;
+        }
+        .btn:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
         }
         .success {
             color: #28a745;
@@ -39,6 +83,11 @@
         }
         .error {
             color: #dc3545;
+            font-weight: bold;
+            margin: 15px 0;
+        }
+        .loading {
+            color: #007bff;
             font-weight: bold;
         }
         #message {
@@ -50,25 +99,90 @@
             height: 80px;
             margin-bottom: 20px;
         }
+        .password-requirements {
+            text-align: left;
+            font-size: 14px;
+            color: #6c757d;
+            margin-top: 10px;
+        }
+        .password-requirements ul {
+            margin: 5px 0;
+            padding-left: 20px;
+        }
+        .hidden {
+            display: none;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <img src="https://github.com/leandrodomingues1789/thetracker-auth/raw/main/app-icon.png" alt="TheTracker Logo" class="app-logo" onerror="this.style.display='none'">
         <h1>TheTracker Password Reset</h1>
-        <div id="message">Processing your password reset request...</div>
-        <p>Please wait while we redirect you back to the app.</p>
+        
+        <!-- Loading/Processing State -->
+        <div id="loading-state">
+            <div id="message">Processing your password reset request...</div>
+            <p>Please wait while we verify your reset link.</p>
+        </div>
+        
+        <!-- Password Reset Form -->
+        <div id="password-form" class="hidden">
+            <p>Please enter your new password below:</p>
+            <form id="reset-form">
+                <div class="form-group">
+                    <label for="new-password">New Password</label>
+                    <input type="password" id="new-password" required minlength="8">
+                    <div class="password-requirements">
+                        <ul>
+                            <li>At least 8 characters long</li>
+                            <li>Mix of letters and numbers recommended</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="confirm-password">Confirm New Password</label>
+                    <input type="password" id="confirm-password" required minlength="8">
+                </div>
+                
+                <button type="submit" class="btn" id="submit-btn">Update Password</button>
+            </form>
+        </div>
+        
+        <!-- Success State -->
+        <div id="success-state" class="hidden">
+            <div class="success">✅ Password Updated Successfully!</div>
+            <p>Your password has been updated. You can now return to TheTracker app and sign in with your new password.</p>
+        </div>
+        
+        <!-- Error State -->
+        <div id="error-state" class="hidden">
+            <div class="error" id="error-message">❌ Invalid or expired reset link</div>
+            <p>This password reset link is invalid or has expired. Please request a new password reset from the TheTracker app.</p>
+        </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
+        // Initialize Supabase client
+        const supabaseUrl = 'https://hqfbtwgretqcdxdzmaaf.supabase.co'
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhxZmJ0d2dyZXRxY2R4ZHptYWFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU1Njg2MTIsImV4cCI6MjA2MTE0NDYxMn0.0bRGUNRYPkYpOeFkyUdbZC2OQcWKitLHJmWevIAg4_U'
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey)
+
         document.addEventListener('DOMContentLoaded', function() {
-            const messageElement = document.getElementById('message');
+            const loadingState = document.getElementById('loading-state');
+            const passwordForm = document.getElementById('password-form');
+            const successState = document.getElementById('success-state');
+            const errorState = document.getElementById('error-state');
+            const resetForm = document.getElementById('reset-form');
+            const submitBtn = document.getElementById('submit-btn');
+            const errorMessage = document.getElementById('error-message');
             
             // Function to parse URL parameters from both hash and query string
             function getTokens() {
                 let accessToken, refreshToken, type, code;
                 
-                // First try to get from hash (fragment) - common for Supabase
+                // First try to get from hash (fragment)
                 if (window.location.hash) {
                     const hashParams = new URLSearchParams(window.location.hash.substring(1));
                     accessToken = hashParams.get('access_token');
@@ -89,97 +203,95 @@
                 return { accessToken, refreshToken, type, code };
             }
             
-            // Debug: Log the current URL for troubleshooting
-            console.log('Current URL:', window.location.href);
-            console.log('Hash:', window.location.hash);
-            console.log('Search:', window.location.search);
+            function showState(state) {
+                loadingState.classList.add('hidden');
+                passwordForm.classList.add('hidden');
+                successState.classList.add('hidden');
+                errorState.classList.add('hidden');
+                
+                document.getElementById(state).classList.remove('hidden');
+            }
             
+            function showError(message) {
+                errorMessage.textContent = `❌ ${message}`;
+                showState('error-state');
+            }
+            
+            // Parse tokens from URL
             const { accessToken, refreshToken, type, code } = getTokens();
-            
-            // Debug: Log extracted tokens
             console.log('Extracted tokens:', { accessToken, refreshToken, type, code });
             
-            // Check if this is a password reset request
+            // Check if we have valid reset parameters
             if (accessToken && refreshToken) {
-                messageElement.textContent = 'Password reset tokens found! Redirecting to app...';
-                messageElement.className = 'success';
-                
-                // Redirect to the app with the tokens
-                window.location.href = `thetracker://reset-password?access_token=${accessToken}&refresh_token=${refreshToken}&type=recovery`;
-                
-                // Fallback message after a delay in case the app doesn't open
-                setTimeout(() => {
-                    messageElement.textContent = 'If the app didn\'t open automatically, please return to TheTracker app and enter your new password.';
-                }, 3000);
-            } else if (code) {
-                messageElement.innerHTML = `
-                    <div style="color: #28a745; margin-bottom: 20px;">
-                        <strong>Authorization code found!</strong>
-                    </div>
-                    <div style="color: #6c757d; font-size: 14px; margin-bottom: 15px;">
-                        Attempting to open TheTracker app...
-                    </div>
-                `;
-                
-                // Try multiple methods to open the app
-                const deepLinkUrl = `thetracker://reset-password?code=${code}&type=recovery`;
-                console.log('Attempting to open:', deepLinkUrl);
-                
-                // Method 1: Create invisible iframe (works better on iOS)
-                const iframe = document.createElement('iframe');
-                iframe.style.display = 'none';
-                iframe.src = deepLinkUrl;
-                document.body.appendChild(iframe);
-                
-                // Method 2: Try window.location as fallback
-                setTimeout(() => {
+                // Direct token flow - set session and show form
+                setTimeout(async () => {
                     try {
-                        window.location.href = deepLinkUrl;
-                    } catch (e) {
-                        console.log('Direct redirect failed:', e);
+                        await supabase.auth.setSession({
+                            access_token: accessToken,
+                            refresh_token: refreshToken
+                        });
+                        showState('password-form');
+                    } catch (error) {
+                        console.error('Session error:', error);
+                        showError('Invalid or expired reset link');
                     }
-                }, 500);
-                
-                // Method 3: Create a clickable link as final fallback
-                setTimeout(() => {
-                    messageElement.innerHTML = `
-                        <div style="color: #28a745; margin-bottom: 20px;">
-                            <strong>Authorization code found!</strong>
-                        </div>
-                        <div style="color: #6c757d; font-size: 14px; margin-bottom: 15px;">
-                            If the app didn't open automatically, tap the button below:
-                        </div>
-                        <a href="${deepLinkUrl}" style="
-                            display: inline-block;
-                            background-color: #007bff;
-                            color: white;
-                            padding: 12px 24px;
-                            text-decoration: none;
-                            border-radius: 6px;
-                            font-weight: bold;
-                            margin: 10px 0;
-                        ">Open TheTracker App</a>
-                        <div style="color: #6c757d; font-size: 12px; margin-top: 15px;">
-                            Or return to TheTracker app manually and enter your new password.
-                        </div>
-                    `;
-                }, 2000);
-                
-                // Clean up iframe
-                setTimeout(() => {
-                    if (iframe.parentNode) {
-                        document.body.removeChild(iframe);
+                }, 1000);
+            } else if (code) {
+                // Authorization code flow - exchange for session
+                setTimeout(async () => {
+                    try {
+                        const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+                        if (error) throw error;
+                        showState('password-form');
+                    } catch (error) {
+                        console.error('Code exchange error:', error);
+                        showError('Invalid or expired reset link');
                     }
-                }, 3000);
+                }, 1000);
             } else {
-                messageElement.textContent = 'Invalid or missing reset parameters.';
-                messageElement.className = 'error';
-                
-                // Debug: Show what we found
-                console.log('Missing tokens. URL breakdown:');
-                console.log('- Hash params:', window.location.hash);
-                console.log('- Query params:', window.location.search);
+                // No valid parameters
+                setTimeout(() => {
+                    showError('Invalid or missing reset parameters');
+                }, 1000);
             }
+            
+            // Handle form submission
+            resetForm.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                
+                const newPassword = document.getElementById('new-password').value;
+                const confirmPassword = document.getElementById('confirm-password').value;
+                
+                // Validate passwords
+                if (newPassword !== confirmPassword) {
+                    showError('Passwords do not match');
+                    return;
+                }
+                
+                if (newPassword.length < 8) {
+                    showError('Password must be at least 8 characters long');
+                    return;
+                }
+                
+                // Update password
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Updating...';
+                
+                try {
+                    const { error } = await supabase.auth.updateUser({
+                        password: newPassword
+                    });
+                    
+                    if (error) throw error;
+                    
+                    showState('success-state');
+                } catch (error) {
+                    console.error('Password update error:', error);
+                    showError('Failed to update password. Please try again.');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Update Password';
+                }
+            });
         });
     </script>
 </body>
