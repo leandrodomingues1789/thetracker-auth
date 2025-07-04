@@ -112,15 +112,64 @@
                     messageElement.textContent = 'If the app didn\'t open automatically, please return to TheTracker app and enter your new password.';
                 }, 3000);
             } else if (code) {
-                messageElement.textContent = 'Authorization code found! Redirecting to app...';
-                messageElement.className = 'success';
+                messageElement.innerHTML = `
+                    <div style="color: #28a745; margin-bottom: 20px;">
+                        <strong>Authorization code found!</strong>
+                    </div>
+                    <div style="color: #6c757d; font-size: 14px; margin-bottom: 15px;">
+                        Attempting to open TheTracker app...
+                    </div>
+                `;
                 
-                // Redirect to the app with the authorization code
-                window.location.href = `thetracker://reset-password?code=${code}&type=recovery`;
+                // Try multiple methods to open the app
+                const deepLinkUrl = `thetracker://reset-password?code=${code}&type=recovery`;
+                console.log('Attempting to open:', deepLinkUrl);
                 
-                // Fallback message after a delay in case the app doesn't open
+                // Method 1: Create invisible iframe (works better on iOS)
+                const iframe = document.createElement('iframe');
+                iframe.style.display = 'none';
+                iframe.src = deepLinkUrl;
+                document.body.appendChild(iframe);
+                
+                // Method 2: Try window.location as fallback
                 setTimeout(() => {
-                    messageElement.textContent = 'If the app didn\'t open automatically, please return to TheTracker app and enter your new password.';
+                    try {
+                        window.location.href = deepLinkUrl;
+                    } catch (e) {
+                        console.log('Direct redirect failed:', e);
+                    }
+                }, 500);
+                
+                // Method 3: Create a clickable link as final fallback
+                setTimeout(() => {
+                    messageElement.innerHTML = `
+                        <div style="color: #28a745; margin-bottom: 20px;">
+                            <strong>Authorization code found!</strong>
+                        </div>
+                        <div style="color: #6c757d; font-size: 14px; margin-bottom: 15px;">
+                            If the app didn't open automatically, tap the button below:
+                        </div>
+                        <a href="${deepLinkUrl}" style="
+                            display: inline-block;
+                            background-color: #007bff;
+                            color: white;
+                            padding: 12px 24px;
+                            text-decoration: none;
+                            border-radius: 6px;
+                            font-weight: bold;
+                            margin: 10px 0;
+                        ">Open TheTracker App</a>
+                        <div style="color: #6c757d; font-size: 12px; margin-top: 15px;">
+                            Or return to TheTracker app manually and enter your new password.
+                        </div>
+                    `;
+                }, 2000);
+                
+                // Clean up iframe
+                setTimeout(() => {
+                    if (iframe.parentNode) {
+                        document.body.removeChild(iframe);
+                    }
                 }, 3000);
             } else {
                 messageElement.textContent = 'Invalid or missing reset parameters.';
