@@ -402,12 +402,19 @@
                 submitBtn.textContent = 'Updating...';
                 
                 try {
-                    const { error } = await supabase.auth.updateUser({
+                    console.log('Attempting to update password...');
+                    const { data, error } = await supabase.auth.updateUser({
                         password: newPassword
                     });
                     
-                    if (error) throw error;
+                    console.log('Password update result:', { data, error });
                     
+                    if (error) {
+                        console.error('Password update failed:', error);
+                        throw error;
+                    }
+                    
+                    console.log('Password updated successfully, showing success state');
                     showState('success-state');
                 } catch (error) {
                     console.error('Password update error:', error);
