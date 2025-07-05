@@ -213,6 +213,14 @@
                     code = queryParams.get('code');
                 }
                 
+                // Also log all available parameters for debugging
+                console.log('All URL parameters:', {
+                    search: window.location.search,
+                    hash: window.location.hash,
+                    searchParams: Object.fromEntries(new URLSearchParams(window.location.search)),
+                    hashParams: Object.fromEntries(new URLSearchParams(window.location.hash.substring(1)))
+                });
+                
                 return { accessToken, refreshToken, type, code };
             }
             
@@ -258,7 +266,28 @@
                             console.log('Attempting to exchange authorization code for session...');
                             
                             try {
-                                // Try using the verifyOtp method for recovery type
+                                // Try using exchangeCodeForSession for PKCE flow
+                                console.log('Trying exchangeCodeForSession...');
+                                const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+                                
+                                console.log('exchangeCodeForSession result:', data, error);
+                                
+                                if (data.session) {
+                                    console.log('Session established via code exchange');
+                                    showState('password-form');
+                                    return;
+                                }
+                                
+                                if (error) {
+                                    console.error('Code exchange failed:', error);
+                                }
+                            } catch (exchangeError) {
+                                console.error('Code exchange error:', exchangeError);
+                            }
+                            
+                            // Fallback: Try OTP verification
+                            try {
+                                console.log('Trying OTP verification as fallback...');
                                 const { data, error } = await supabase.auth.verifyOtp({
                                     token_hash: code,
                                     type: 'recovery'
