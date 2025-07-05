@@ -193,7 +193,7 @@
             
             // Function to parse URL parameters from both hash and query string
             function getTokens() {
-                let accessToken, refreshToken, type, code;
+                let accessToken, refreshToken, type, code, tokenHash;
                 
                 // First try to get from hash (fragment)
                 if (window.location.hash) {
@@ -202,15 +202,17 @@
                     refreshToken = hashParams.get('refresh_token');
                     type = hashParams.get('type');
                     code = hashParams.get('code');
+                    tokenHash = hashParams.get('token_hash');
                 }
                 
                 // If not found in hash, try query string
-                if (!accessToken && !refreshToken && !code) {
+                if (!accessToken && !refreshToken && !code && !tokenHash) {
                     const queryParams = new URLSearchParams(window.location.search);
                     accessToken = queryParams.get('access_token');
                     refreshToken = queryParams.get('refresh_token');
                     type = queryParams.get('type');
                     code = queryParams.get('code');
+                    tokenHash = queryParams.get('token_hash');
                 }
                 
                 // Also log all available parameters for debugging
@@ -221,7 +223,7 @@
                     hashParams: Object.fromEntries(new URLSearchParams(window.location.hash.substring(1)))
                 });
                 
-                return { accessToken, refreshToken, type, code };
+                return { accessToken, refreshToken, type, code, tokenHash };
             }
             
             function showState(state) {
@@ -239,7 +241,7 @@
             }
             
             // Parse tokens from URL
-            const { accessToken, refreshToken, type, code } = getTokens();
+            const { accessToken, refreshToken, type, code, tokenHash } = getTokens();
             console.log('Extracted tokens:', { accessToken, refreshToken, type, code });
             console.log('Full URL:', window.location.href);
             
@@ -258,11 +260,34 @@
                     }
                     
                     // Check if we have URL parameters that indicate a password reset
-                    if (code || accessToken || window.location.search.includes('code=') || window.location.hash.includes('access_token')) {
+                    if (code || tokenHash || accessToken || window.location.search.includes('code=') || window.location.search.includes('token_hash=') || window.location.hash.includes('access_token')) {
                         console.log('Password reset parameters detected, trying to establish session...');
                         
-                        // Try to manually exchange the authorization code for a session
-                        if (code) {
+                        // Try to manually exchange the authorization code or token hash for a session
+                        if (tokenHash && type === 'recovery') {
+                            console.log('Attempting to verify token hash for recovery...');
+                            
+                            try {
+                                const { data, error } = await supabase.auth.verifyOtp({
+                                    token_hash: tokenHash,
+                                    type: 'recovery'
+                                });
+                                
+                                console.log('Token hash verification result:', data, error);
+                                
+                                if (data.session) {
+                                    console.log('Session established via token hash verification');
+                                    showState('password-form');
+                                    return;
+                                }
+                                
+                                if (error) {
+                                    console.error('Token hash verification failed:', error);
+                                }
+                            } catch (tokenError) {
+                                console.error('Token hash verification error:', tokenError);
+                            }
+                        } else if (code) {
                             console.log('Attempting to exchange authorization code for session...');
                             
                             try {
