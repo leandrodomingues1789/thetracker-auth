@@ -253,27 +253,34 @@
                     if (code || accessToken || window.location.search.includes('code=') || window.location.hash.includes('access_token')) {
                         console.log('Password reset parameters detected, trying to establish session...');
                         
-                        // Try to get session from URL hash/fragments
-                        const { data, error } = await supabase.auth.getSessionFromUrl();
-                        console.log('Session from URL:', data, error);
+                        // For password reset, we need to handle the session differently
+                        // The session should be automatically established by Supabase's redirect
+                        console.log('Waiting for Supabase to establish session after redirect...');
                         
-                        if (data.session) {
-                            console.log('Successfully got session from URL');
-                            showState('password-form');
-                            return;
-                        }
+                        // Wait longer for the session to be established
+                        let attempts = 0;
+                        const maxAttempts = 15;
                         
-                        // If getSessionFromUrl didn't work, wait and check again
-                        setTimeout(async () => {
+                        const waitForSession = async () => {
+                            attempts++;
                             const { data: { session }, error } = await supabase.auth.getSession();
-                            console.log('Final session check:', session);
+                            console.log(`Session check attempt ${attempts}:`, session ? 'Session found' : 'No session');
                             
                             if (session) {
+                                console.log('Session established successfully');
                                 showState('password-form');
+                                return;
+                            }
+                            
+                            if (attempts < maxAttempts) {
+                                setTimeout(waitForSession, 1000); // Wait 1 second between attempts
                             } else {
+                                console.log('Max attempts reached, session not established');
                                 showError('Reset link has expired or is invalid. Please request a new password reset.');
                             }
-                        }, 2000);
+                        };
+                        
+                        waitForSession();
                     } else {
                         // No reset parameters found
                         showError('Invalid or missing reset parameters');
