@@ -253,13 +253,38 @@
                     if (code || accessToken || window.location.search.includes('code=') || window.location.hash.includes('access_token')) {
                         console.log('Password reset parameters detected, trying to establish session...');
                         
-                        // For password reset, we need to handle the session differently
-                        // The session should be automatically established by Supabase's redirect
+                        // Try to manually exchange the authorization code for a session
+                        if (code) {
+                            console.log('Attempting to exchange authorization code for session...');
+                            
+                            try {
+                                // Try using the verifyOtp method for recovery type
+                                const { data, error } = await supabase.auth.verifyOtp({
+                                    token_hash: code,
+                                    type: 'recovery'
+                                });
+                                
+                                console.log('OTP verification result:', data, error);
+                                
+                                if (data.session) {
+                                    console.log('Session established via OTP verification');
+                                    showState('password-form');
+                                    return;
+                                }
+                                
+                                if (error) {
+                                    console.error('OTP verification failed:', error);
+                                }
+                            } catch (otpError) {
+                                console.error('OTP verification error:', otpError);
+                            }
+                        }
+                        
+                        // Fallback: Wait for automatic session establishment
                         console.log('Waiting for Supabase to establish session after redirect...');
                         
-                        // Wait longer for the session to be established
                         let attempts = 0;
-                        const maxAttempts = 15;
+                        const maxAttempts = 10;
                         
                         const waitForSession = async () => {
                             attempts++;
@@ -273,7 +298,7 @@
                             }
                             
                             if (attempts < maxAttempts) {
-                                setTimeout(waitForSession, 1000); // Wait 1 second between attempts
+                                setTimeout(waitForSession, 1000);
                             } else {
                                 console.log('Max attempts reached, session not established');
                                 showError('Reset link has expired or is invalid. Please request a new password reset.');
